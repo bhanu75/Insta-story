@@ -185,8 +185,8 @@ This project is open source and available under the [MIT License](LICENSE).
 ## 👨‍💻 Author
 
 Your Name
-- GitHub: [@YOUR_USERNAME](https://github.com/YOUR_USERNAME)
-- Website: [your-website.com](https://your-website.com)
+- GitHub: Bhanu75 (https://github.com/Bhanu75)
+- Website: (https://bt12.netlify.app/)
 
 ## 🙏 Acknowledgments
 
