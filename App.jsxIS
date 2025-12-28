@@ -1,0 +1,918 @@
+import { useState, useEffect, useRef } from 'react';
+
+// Initial stories data
+const INITIAL_STORIES = [
+  {
+    id: 1,
+    username: 'travel_diaries',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop',
+    stories: [
+      { 
+        id: 's1', 
+        image: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=600&h=1000&fit=crop',
+        caption: 'Beautiful sunset 🌅',
+        timestamp: new Date(Date.now() - 3600000).toISOString(),
+        comments: [],
+        liked: false
+      }
+    ]
+  },
+  {
+    id: 2,
+    username: 'food_lover',
+    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop',
+    stories: [
+      { 
+        id: 's2', 
+        image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&h=1000&fit=crop',
+        caption: 'Delicious pasta 🍝',
+        timestamp: new Date(Date.now() - 7200000).toISOString(),
+        comments: [
+          { id: 'c1', username: 'foodie123', text: 'Looks amazing!', timestamp: new Date(Date.now() - 7000000).toISOString() }
+        ],
+        liked: false
+      }
+    ]
+  },
+  {
+    id: 3,
+    username: 'urban_explorer',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop',
+    stories: [
+      { 
+        id: 's3', 
+        image: 'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=600&h=1000&fit=crop',
+        caption: 'City lights ✨',
+        timestamp: new Date(Date.now() - 10800000).toISOString(),
+        comments: [],
+        liked: false
+      }
+    ]
+  }
+];
+
+const FEED_POSTS = [
+  {
+    id: 'p1',
+    username: 'travel_diaries',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop',
+    image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop',
+    caption: 'Mountain vibes 🏔️',
+    likes: 234,
+    timestamp: new Date(Date.now() - 86400000).toISOString(),
+    comments: [
+      { username: 'user1', text: 'Amazing view!' },
+      { username: 'user2', text: 'Where is this?' }
+    ]
+  },
+  {
+    id: 'p2',
+    username: 'food_lover',
+    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop',
+    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&h=600&fit=crop',
+    caption: 'Homemade pizza 🍕',
+    likes: 189,
+    timestamp: new Date(Date.now() - 172800000).toISOString(),
+    comments: [
+      { username: 'chef_mike', text: 'Recipe please!' }
+    ]
+  },
+  {
+    id: 'p3',
+    username: 'urban_explorer',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop',
+    image: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=800&h=600&fit=crop',
+    caption: 'Night photography session',
+    likes: 421,
+    timestamp: new Date(Date.now() - 259200000).toISOString(),
+    comments: []
+  }
+];
+
+// Storage utilities
+const STORAGE_KEY = 'instagram_stories_data';
+const FEED_STORAGE_KEY = 'instagram_feed_data';
+
+const saveToStorage = (stories, feed) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stories));
+    localStorage.setItem(FEED_STORAGE_KEY, JSON.stringify(feed));
+  } catch (error) {
+    console.error('Error saving to localStorage:', error);
+  }
+};
+
+const loadFromStorage = () => {
+  try {
+    const storiesData = localStorage.getItem(STORAGE_KEY);
+    const feedData = localStorage.getItem(FEED_STORAGE_KEY);
+    return {
+      stories: storiesData ? JSON.parse(storiesData) : INITIAL_STORIES,
+      feed: feedData ? JSON.parse(feedData) : FEED_POSTS
+    };
+  } catch (error) {
+    console.error('Error loading from localStorage:', error);
+    return { stories: INITIAL_STORIES, feed: FEED_POSTS };
+  }
+};
+
+const StoryThumbnail = ({ user, onClick, isActive }) => {
+  return (
+    <div onClick={onClick} className="flex flex-col items-center gap-1 flex-shrink-0 cursor-pointer">
+      <div className={`p-0.5 rounded-full ${isActive ? 'bg-gray-300' : 'bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-500'}`}>
+        <div className="p-0.5 bg-white rounded-full">
+          <img
+            src={user.avatar}
+            alt={user.username}
+            className="w-16 h-16 rounded-full object-cover"
+          />
+        </div>
+      </div>
+      <span className="text-xs text-gray-800 max-w-[70px] truncate">{user.username}</span>
+    </div>
+  );
+};
+
+const ProgressBar = ({ duration, isActive, isPaused }) => {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (!isActive || isPaused) return;
+
+    setProgress(0);
+    const interval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          return 100;
+        }
+        return prev + (100 / (duration / 50));
+      });
+    }, 50);
+
+    return () => clearInterval(interval);
+  }, [isActive, duration, isPaused]);
+
+  return (
+    <div className="h-0.5 bg-white bg-opacity-30 rounded-full overflow-hidden flex-1">
+      <div
+        className="h-full bg-white transition-all duration-100 ease-linear"
+        style={{ width: `${progress}%` }}
+      />
+    </div>
+  );
+};
+
+const CommentsModal = ({ story, onClose, onAddComment }) => {
+  const [comment, setComment] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (comment.trim()) {
+      onAddComment(comment.trim());
+      setComment('');
+    }
+  };
+
+  const getTimeAgo = (timestamp) => {
+    const seconds = Math.floor((new Date() - new Date(timestamp)) / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+    return `${Math.floor(seconds / 86400)}d`;
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+      <div className="bg-white w-full rounded-t-3xl max-h-[80vh] flex flex-col">
+        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+          <h3 className="font-semibold text-lg">Comments</h3>
+          <button onClick={onClose} className="text-gray-500 text-2xl">×</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          {story.comments.length === 0 ? (
+            <div className="text-center text-gray-500 py-8">
+              <p className="text-sm">No comments yet</p>
+              <p className="text-xs mt-1">Be the first to comment</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {story.comments.map(comment => (
+                <div key={comment.id} className="flex gap-3">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
+                    {comment.username.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm">{comment.username}</span>
+                      <span className="text-xs text-gray-500">{getTimeAgo(comment.timestamp)}</span>
+                    </div>
+                    <p className="text-sm mt-1">{comment.text}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-4 border-t border-gray-200">
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="Add a comment..."
+              className="flex-1 bg-gray-100 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+            <button
+              type="submit"
+              disabled={!comment.trim()}
+              className={`font-semibold text-sm ${comment.trim() ? 'text-blue-500' : 'text-gray-400'}`}
+            >
+              Post
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+const StoryViewer = ({ user, onClose, onNavigate, currentUserIndex, totalUsers, onLike, onComment }) => {
+  const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const timerRef = useRef(null);
+  const touchStartRef = useRef(null);
+
+  const currentStory = user.stories[currentStoryIndex];
+  const totalStories = user.stories.length;
+
+  useEffect(() => {
+    setImageLoaded(false);
+    const img = new Image();
+    img.src = currentStory.image;
+    img.onload = () => setImageLoaded(true);
+  }, [currentStory.image]);
+
+  useEffect(() => {
+    if (!imageLoaded || isPaused || showComments) return;
+
+    timerRef.current = setTimeout(() => {
+      handleNext();
+    }, 5000);
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [currentStoryIndex, imageLoaded, isPaused, user.id, showComments]);
+
+  const handleNext = () => {
+    if (currentStoryIndex < totalStories - 1) {
+      setCurrentStoryIndex(prev => prev + 1);
+    } else if (currentUserIndex < totalUsers - 1) {
+      onNavigate('nextUser');
+    } else {
+      onClose();
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentStoryIndex > 0) {
+      setCurrentStoryIndex(prev => prev - 1);
+    } else if (currentUserIndex > 0) {
+      onNavigate('prevUser');
+    }
+  };
+
+  const handleTouchStart = (e) => {
+    touchStartRef.current = e.touches[0].clientX;
+    setIsPaused(true);
+  };
+
+  const handleTouchEnd = (e) => {
+    if (!touchStartRef.current) return;
+
+    const touchEnd = e.changedTouches[0].clientX;
+    const screenWidth = window.innerWidth;
+    
+    setIsPaused(false);
+
+    if (touchStartRef.current < screenWidth / 2) {
+      handlePrevious();
+    } else {
+      handleNext();
+    }
+
+    touchStartRef.current = null;
+  };
+
+  const handleAddComment = (text) => {
+    onComment(user.id, currentStory.id, text);
+  };
+
+  const getTimeAgo = (timestamp) => {
+    const seconds = Math.floor((new Date() - new Date(timestamp)) / 1000);
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+    return `${Math.floor(seconds / 86400)}d`;
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black z-50 flex flex-col">
+      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/50 to-transparent p-3">
+        <div className="flex gap-1 mb-3">
+          {user.stories.map((_, index) => (
+            <ProgressBar
+              key={index}
+              duration={5000}
+              isActive={index === currentStoryIndex && imageLoaded}
+              isPaused={isPaused || showComments}
+            />
+          ))}
+        </div>
+        
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <img
+              src={user.avatar}
+              alt={user.username}
+              className="w-8 h-8 rounded-full object-cover border-2 border-white"
+            />
+            <span className="text-white font-semibold text-sm">{user.username}</span>
+            <span className="text-white/70 text-xs">{getTimeAgo(currentStory.timestamp)}</span>
+          </div>
+          
+          <button
+            onClick={onClose}
+            className="text-white text-2xl w-8 h-8 flex items-center justify-center"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+
+      <div
+        className="flex-1 relative flex items-center justify-center"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        {!imageLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+          </div>
+        )}
+        
+        <img
+          src={currentStory.image}
+          alt="Story"
+          className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${
+            imageLoaded ? 'opacity-100' : 'opacity-0'
+          }`}
+        />
+
+        {currentStory.caption && (
+          <div className="absolute bottom-20 left-4 right-4 bg-black/30 backdrop-blur-sm rounded-lg p-3">
+            <p className="text-white text-sm">{currentStory.caption}</p>
+          </div>
+        )}
+
+        <div className="absolute inset-0 flex">
+          <div className="flex-1" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} />
+          <div className="flex-1" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} />
+        </div>
+      </div>
+
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-4">
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Send message"
+            onClick={() => setShowComments(true)}
+            readOnly
+            className="flex-1 bg-transparent border border-white/50 rounded-full px-4 py-2 text-white placeholder-white/70 text-sm cursor-pointer"
+          />
+          <button 
+            onClick={() => onLike(user.id, currentStory.id)}
+            className="text-white"
+          >
+            <svg className="w-6 h-6" fill={currentStory.liked ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+            </svg>
+          </button>
+          <button 
+            onClick={() => setShowComments(true)}
+            className="text-white relative"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            {currentStory.comments.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                {currentStory.comments.length}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {showComments && (
+        <CommentsModal
+          story={currentStory}
+          onClose={() => setShowComments(false)}
+          onAddComment={handleAddComment}
+        />
+      )}
+    </div>
+  );
+};
+
+const AddStoryModal = ({ onClose, onAdd }) => {
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [caption, setCaption] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handleImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (file && file.type.startsWith('image/')) {
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedImage || !caption.trim()) return;
+
+    setUploading(true);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    onAdd({
+      image: imagePreview,
+      caption: caption.trim()
+    });
+    
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col">
+        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+          <h2 className="text-xl font-semibold">Add to Story</h2>
+          <button onClick={onClose} className="text-gray-500 text-2xl">×</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          {!imagePreview ? (
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-gray-300 rounded-xl h-64 flex flex-col items-center justify-center cursor-pointer hover:border-purple-500 transition"
+            >
+              <svg className="w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <p className="text-gray-600 font-medium">Choose a photo</p>
+              <p className="text-gray-400 text-sm mt-1">or drag and drop</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="relative rounded-xl overflow-hidden">
+                <img src={imagePreview} alt="Preview" className="w-full h-64 object-cover" />
+                <button
+                  onClick={() => {
+                    setSelectedImage(null);
+                    setImagePreview(null);
+                  }}
+                  className="absolute top-2 right-2 bg-black bg-opacity-50 text-white rounded-full p-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Caption</label>
+                <textarea
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  placeholder="Write a caption..."
+                  rows={3}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+            </div>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageSelect}
+            className="hidden"
+          />
+        </div>
+
+        {imagePreview && (
+          <div className="p-4 border-t border-gray-200">
+            <button
+              onClick={handleSubmit}
+              disabled={!caption.trim() || uploading}
+              className={`w-full py-3 rounded-full font-semibold transition ${
+                caption.trim() && !uploading
+                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                  : 'bg-gray-200 text-gray-400'
+              }`}
+            >
+              {uploading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Posting...
+                </span>
+              ) : (
+                'Share to Story'
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const FeedPost = ({ post, onLike, onComment }) => {
+  const [showComments, setShowComments] = useState(false);
+  const [comment, setComment] = useState('');
+  const [isLiked, setIsLiked] = useState(false);
+
+  const getTimeAgo = (timestamp) => {
+    const seconds = Math.floor((new Date() - new Date(timestamp)) / 1000);
+    if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+    return `${Math.floor(seconds / 86400)} days ago`;
+  };
+
+  const handleLike = () => {
+    setIsLiked(!isLiked);
+    onLike(post.id);
+  };
+
+  const handleCommentSubmit = (e) => {
+    e.preventDefault();
+    if (comment.trim()) {
+      onComment(post.id, comment.trim());
+      setComment('');
+    }
+  };
+
+  return (
+    <div className="bg-white border-b border-gray-200">
+      <div className="flex items-center justify-between p-3">
+        <div className="flex items-center gap-2">
+          <img src={post.avatar} alt={post.username} className="w-8 h-8 rounded-full object-cover" />
+          <span className="font-semibold text-sm">{post.username}</span>
+        </div>
+        <button className="text-gray-800">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+          </svg>
+        </button>
+      </div>
+
+      <img src={post.image} alt="Post" className="w-full aspect-square object-cover" />
+
+      <div className="p-3">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-4">
+            <button onClick={handleLike}>
+              <svg className={`w-7 h-7 ${isLiked ? 'fill-red-500 text-red-500' : 'text-gray-800'}`} fill={isLiked ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+            </button>
+            <button onClick={() => setShowComments(!showComments)}>
+              <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </button>
+            <button>
+              <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            </button>
+          </div>
+          <button>
+            <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+            </svg>
+          </button>
+        </div>
+
+        <p className="font-semibold text-sm mb-1">{post.likes + (isLiked ? 1 : 0)} likes</p>
+        
+        <p className="text-sm mb-1">
+          <span className="font-semibold mr-2">{post.username}</span>
+          {post.caption}
+        </p>
+
+        {post.comments.length > 0 && !showComments && (
+          <button 
+            onClick={() => setShowComments(true)}
+            className="text-gray-500 text-sm mb-1"
+          >
+            View all {post.comments.length} comments
+          </button>
+        )}
+
+        {showComments && (
+          <div className="space-y-1 mb-2">
+            {post.comments.map((c, i) => (
+              <p key={i} className="text-sm">
+                <span className="font-semibold mr-2">{c.username}</span>
+                {c.text}
+              </p>
+            ))}
+          </div>
+        )}
+
+        <p className="text-xs text-gray-500 mb-2">{getTimeAgo(post.timestamp)}</p>
+
+        <form onSubmit={handleCommentSubmit} className="flex items-center gap-2 border-t border-gray-100 pt-2">
+          <input
+            type="text"
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Add a comment..."
+            className="flex-1 text-sm focus:outline-none"
+          />
+          <button
+            type="submit"
+            disabled={!comment.trim()}
+            className={`text-sm font-semibold ${comment.trim() ? 'text-blue-500' : 'text-gray-400'}`}
+          >
+            Post
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default function App() {
+  const [stories, setStories] = useState([]);
+  const [feedPosts, setFeedPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedUserIndex, setSelectedUserIndex] = useState(null);
+  const [viewedStories, setViewedStories] = useState(new Set());
+  const [showAddStory, setShowAddStory] = useState(false);
+
+  const currentUser = {
+    id: 0,
+    username: 'Your Story',
+    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop',
+    stories: []
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const { stories: savedStories, feed: savedFeed } = loadFromStorage();
+        await new Promise(resolve => setTimeout(resolve, 500));
+        setStories(savedStories);
+        setFeedPosts(savedFeed);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  useEffect(() => {
+    if (!loading && stories.length > 0) {
+      saveToStorage(stories, feedPosts);
+    }
+  }, [stories, feedPosts, loading]);
+
+  const handleStoryClick = (index) => {
+    setSelectedUserIndex(index);
+    setViewedStories(prev => new Set([...prev, stories[index].id]));
+  };
+
+  const handleCloseStory = () => {
+    setSelectedUserIndex(null);
+  };
+
+  const handleNavigate = (direction) => {
+    if (direction === 'nextUser' && selectedUserIndex < stories.length - 1) {
+      const nextIndex = selectedUserIndex + 1;
+      setSelectedUserIndex(nextIndex);
+      setViewedStories(prev => new Set([...prev, stories[nextIndex].id]));
+    } else if (direction === 'prevUser' && selectedUserIndex > 0) {
+      const prevIndex = selectedUserIndex - 1;
+      setSelectedUserIndex(prevIndex);
+      setViewedStories(prev => new Set([...prev, stories[prevIndex].id]));
+    }
+  };
+
+  const handleAddStory = (storyData) => {
+    const newStory = {
+      id: `s_${Date.now()}`,
+      image: storyData.image,
+      caption: storyData.caption,
+      timestamp: new Date().toISOString(),
+      comments: [],
+      liked: false
+    };
+
+    setStories(prev => {
+      const userStoryIndex = prev.findIndex(u => u.id === 0);
+      if (userStoryIndex >= 0) {
+        const updated = [...prev];
+        updated[userStoryIndex].stories.push(newStory);
+        return updated;
+      } else {
+        return [{
+          ...currentUser,
+          stories: [newStory]
+        }, ...prev];
+      }
+    });
+  };
+
+  const handleLike = (userId, storyId) => {
+    setStories(prev => prev.map(user => {
+      if (user.id === userId) {
+        return {
+          ...user,
+          stories: user.stories.map(story => 
+            story.id === storyId ? { ...story, liked: !story.liked } : story
+          )
+        };
+      }
+      return user;
+    }));
+  };
+
+  const handleComment = (userId, storyId, text) => {
+    const newComment = {
+      id: `c_${Date.now()}`,
+      username: 'You',
+      text,
+      timestamp: new Date().toISOString()
+    };
+
+    setStories(prev => prev.map(user => {
+      if (user.id === userId) {
+        return {
+          ...user,
+          stories: user.stories.map(story => 
+            story.id === storyId 
+              ? { ...story, comments: [...story.comments, newComment] }
+              : story
+          )
+        };
+      }
+      return user;
+    }));
+  };
+
+  const handleFeedLike = (postId) => {
+    setFeedPosts(prev => prev.map(post => 
+      post.id === postId ? { ...post, likes: post.likes + 1 } : post
+    ));
+  };
+
+  const handleFeedComment = (postId, text) => {
+    const newComment = {
+      username: 'You',
+      text
+    };
+
+    setFeedPosts(prev => prev.map(post => 
+      post.id === postId 
+        ? { ...post, comments: [...post.comments, newComment] }
+        : post
+    ));
+  };
+
+  const userStory = stories.find(u => u.id === 0) || currentUser;
+  const otherStories = stories.filter(u => u.id !== 0);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-gray-300 border-t-gray-800 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-white">
+      <div className="max-w-md mx-auto">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <h1 className="text-2xl font-bold">Instagram</h1>
+          <div className="flex gap-4">
+            <button 
+              onClick={() => setShowAddStory(true)}
+              className="text-gray-800"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+            <button className="text-gray-800">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+            </button>
+            <button className="text-gray-800">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto px-4 py-3 border-b border-gray-200">
+          <div className="flex gap-4">
+            <div 
+              onClick={() => userStory.stories.length > 0 ? handleStoryClick(stories.indexOf(userStory)) : setShowAddStory(true)}
+              className="flex flex-col items-center gap-1 flex-shrink-0 cursor-pointer"
+            >
+              <div className="relative">
+                <div className={`p-0.5 rounded-full ${userStory.stories.length > 0 ? 'bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-500' : 'bg-gray-300'}`}>
+                  <div className="p-0.5 bg-white rounded-full">
+                    <img
+                      src={currentUser.avatar}
+                      alt="Your Story"
+                      className="w-16 h-16 rounded-full object-cover"
+                    />
+                  </div>
+                </div>
+                {userStory.stories.length === 0 && (
+                  <div className="absolute bottom-0 right-0 bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center border-2 border-white">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+              <span className="text-xs text-gray-800">Your Story</span>
+            </div>
+
+            {otherStories.map((user, index) => (
+              <StoryThumbnail
+                key={user.id}
+                user={user}
+                onClick={() => handleStoryClick(stories.indexOf(user))}
+                isActive={viewedStories.has(user.id)}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="pb-16">
+          {feedPosts.map(post => (
+            <FeedPost
+              key={post.id}
+              post={post}
+              onLike={handleFeedLike}
+              onComment={handleFeedComment}
+            />
+          ))}
+        </div>
+      </div>
+
+      {selectedUserIndex !== null && (
+        <StoryViewer
+          user={stories[selectedUserIndex]}
+          onClose={handleCloseStory}
+          onNavigate={handleNavigate}
+          currentUserIndex={selectedUserIndex}
+          totalUsers={stories.length}
+          onLike={handleLike}
+          onComment={handleComment}
+        />
+      )}
+
+      {showAddStory && (
+        <AddStoryModal
+          onClose={() => setShowAddStory(false)}
+          onAdd={handleAddStory}
+        />
+      )}
+    </div>
+  );
+}
